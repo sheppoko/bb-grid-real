@@ -6,13 +6,14 @@ const (
 
 const (
 	CoinName                     = "xrp"
-	OrderNumInOnetime            = 2
+	OrderNumInOnetime            = 3
 	UnSoldBuyPositionLogFileName = "unsold_buy_position.json"
+	SecJsonFileName              = "sec.json"
 )
 
 var (
-	BuyRange               = 0.0001
-	TakeProfitRange        = 0.0001
-	MaxPositionCount       = 2000
+	BuyRange               = 0.003
+	TakeProfitRange        = 0.003
+	MaxPositionCount       = 119
 	PositionMaxDownPercent = 30.0
 )

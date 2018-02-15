@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"strconv"
 	"time"
 
@@ -21,13 +22,20 @@ const (
 	CandleAPIEndpointBase = "https://public.bitbank.cc/" + config.CoinName + "_jpy/candlestick/1min/"
 	BoardAPIEndpoint      = "https://public.bitbank.cc/" + config.CoinName + "_jpy/depth"
 	APIKey                = "71565a43-e7a8-433e-a868-e467507b3638"
-	APISecret             = ""
 	AssetsPath            = "/v1/user/assets"
 	ActiveOrdersPath      = "/v1/user/spot/active_orders"
 	TradeHistoryPath      = "/v1/user/spot/trade_history"
 	OrderPath             = "/v1/user/spot/order"
 	CancelOrdersPath      = "/v1/user/spot/cancel_orders"
 	OrdersInfoPath        = "/v1/user/spot/orders_info"
+)
+
+type Sec struct {
+	Value string `json:"sec"`
+}
+
+var (
+	apiSecret = &Sec{}
 )
 
 var nonceIncrementalCounter = 0.0
@@ -437,6 +445,14 @@ func nonce() string {
 
 //queryStringの署名�������字列を返却します
 func signature(method string, nonce string, path string, queryStringOrBody string) string {
+	if apiSecret.Value == "" {
+		raw, err := ioutil.ReadFile(config.SecJsonFileName)
+		if err != nil {
+			panic("Secの読み込みに失敗しました")
+
+		}
+		json.Unmarshal(raw, &apiSecret)
+	}
 	rawString := ""
 	if method == "GET" {
 		rawString = nonce + path
@@ -446,7 +462,7 @@ func signature(method string, nonce string, path string, queryStringOrBody strin
 	} else {
 		rawString = nonce + queryStringOrBody
 	}
-	mac := hmac.New(sha256.New, []byte(APISecret))
+	mac := hmac.New(sha256.New, []byte(apiSecret.Value))
 	mac.Write([]byte(rawString))
 	return hex.EncodeToString(mac.Sum(nil))
 }

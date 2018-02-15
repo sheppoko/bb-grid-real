@@ -3,6 +3,7 @@ package util
 import (
 	"encoding/json"
 	"io/ioutil"
+	"math"
 	"os"
 	"strconv"
 )
@@ -39,4 +40,10 @@ func EncodingJSON(data interface{}) []byte {
 		return nil
 	}
 	return bdata
+}
+
+//小数を指定の位置で四捨五入します
+func Round(f float64, places int) float64 {
+	shift := math.Pow(10, float64(places))
+	return math.Floor(f*shift+.5) / shift
 }

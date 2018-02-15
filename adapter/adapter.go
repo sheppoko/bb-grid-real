@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"math"
-	"sync"
 	"time"
 )
 
@@ -21,16 +20,14 @@ type UnsoldBuyOrder struct {
 var unSoldBuyOrders = []*UnsoldBuyOrder{}
 var latestPositionNum int
 var activeOrdersCache *api.ActiveOrdersResponse
-var sellCounter = 0.0
 var highestMarketPrice = 0.0
-var l sync.Mutex
 
 func StartStrategy() {
 	counter := 0
 	for {
 		time.Sleep(1000 * time.Millisecond) // 休む
 		initCache()
-		if counter%60 == 0 {
+		if counter%60 == 0 && false {
 			counter = 0
 			errCandle := SetRangeFromCandle()
 			if errCandle != nil {
@@ -69,7 +66,7 @@ func initCache() {
 
 func SetRangeFromCandle() error {
 
-	candle, errCandle := api.GetCandle(time.Now().AddDate(0, 0, -1))
+	candle, errCandle := api.GetCandle(time.Now().AddDate(0, 0, -2))
 	if errCandle != nil {
 		return errCandle
 	}
@@ -77,7 +74,8 @@ func SetRangeFromCandle() error {
 	bestRange := 0.0
 	bestMaxPosition := 0.0
 	bestCounter := 0.0
-	for buyRange := 0.0005; buyRange < 0.01; buyRange = buyRange + 0.0005 {
+	for buyRange := 0.0001; buyRange < 0.01; buyRange = buyRange + 0.0001 {
+
 		simCounter := 0.0
 		shouldUpdateLow := false
 		basePrice, _ := util.StringToFloat(candle.Data.Candlestick[0].Ohlcv[0][2].(string))
@@ -92,8 +90,8 @@ func SetRangeFromCandle() error {
 			if basePrice > low {
 				basePrice = low
 			}
-			if ((high-basePrice)/basePrice)*0.75 > buyRange {
-				simCounter += ((high - basePrice) / basePrice) * 0.75 / buyRange
+			if ((high-basePrice)/basePrice)*0.5 > buyRange {
+				simCounter += float64(int64(((high - basePrice) / basePrice) * 0.75 / buyRange))
 				shouldUpdateLow = true
 			}
 		}
@@ -108,8 +106,9 @@ func SetRangeFromCandle() error {
 		}
 	}
 	config.BuyRange = bestRange
+	config.TakeProfitRange = bestRange
 	config.MaxPositionCount = int(bestMaxPosition)
-	fmt.Printf("期待日利:%f(%f幅,%f回利益確定)に設定されました\n", bestEstimatePercent, bestRange, bestCounter)
+	fmt.Printf("期待日利:%f(%f幅,%f回利益確定,%fポジション数)に設定されました\n", bestEstimatePercent, bestRange, bestCounter, bestMaxPosition)
 	return nil
 
 }
@@ -151,11 +150,10 @@ func OrderIfNeed(nowPositionNum int) error {
 		return errB
 	}
 	boardPrice, _ := util.StringToFloat(board.Data.Asks[0][0])
-	basePrice := lowestSell
+	startPrice := (lowestSell / (1 + config.TakeProfitRange)) * (1 - config.BuyRange)
 	if lowestSell < boardPrice {
-		basePrice = boardPrice
+		startPrice = (boardPrice / (1 + config.TakeProfitRange))
 	}
-	startPrice := (basePrice / (1 + config.TakeProfitRange)) * (1 - config.BuyRange)
 	orderNum := config.MaxPositionCount - nowPositionNum
 	buyMax := orderNum
 	if buyMax >= config.OrderNumInOnetime {
@@ -174,7 +172,6 @@ func OrderIfNeed(nowPositionNum int) error {
 			}
 			useJpy := freeJpy / float64(orderNum)
 			amount := useJpy / p
-			sellCounter++
 			BuyCoinAndRegistUnsold(amount, p)
 		} else {
 			continue
@@ -196,51 +193,9 @@ func hasRangeBuyOrder(price float64) (bool, error) {
 	return false, nil
 }
 
-//現在の状況からMAXポジション数まで注文を全て入れます。ただし上限は10です。
-func OrderAllICan(isLastTradeBuy bool, lastEstablishBuyPrice float64, nowPositionNum int) (bool, error) {
-	_, errCancel := CancelAllBuyOrders()
-	if errCancel != nil {
-		fmt.Println("買い注文のキャンセルに失敗しました")
-		return false, errCancel
-	}
-	positionNum, err := GetSellPriceKindNum()
-	if err != nil {
-		fmt.Println("現在のポジション数取得に失敗しました")
-	}
-	orderNum := config.MaxPositionCount - positionNum
-	board, errBoard := api.GetBoard()
-	if errBoard != nil {
-		return false, errBoard
-	}
-	freeJpy, errJpy := api.GetFreeJPY()
-	if errJpy != nil {
-		return false, errJpy
-	}
-
-	startPrice, _ := util.StringToFloat(board.Data.Asks[0][0])
-	if nowPositionNum != 0 {
-		startPrice = startPrice / (1 + config.BuyRange)
-	}
-	if isLastTradeBuy && lastEstablishBuyPrice > 0 && nowPositionNum != 0 {
-		startPrice = lastEstablishBuyPrice * (1 - config.BuyRange)
-	}
-	useJpy := freeJpy / float64(orderNum)
-	if orderNum >= 5 {
-		orderNum = 5
-	}
-	for i := 0; i < orderNum; i++ {
-		price := startPrice * (1.0 - config.BuyRange*(float64(i)))
-		amount := useJpy / price
-		_, err = BuyCoinAndRegistUnsold(amount, price)
-		if err != nil {
-			CancelAllBuyOrders()
-			return false, err
-		}
-	}
-	return true, nil
-}
-
 func BuyCoinAndRegistUnsold(amount float64, price float64) (bool, error) {
+	amount = util.Round(amount, 4)
+
 	res, err := api.BuyCoin(amount, price)
 	if err != nil {
 		return false, err
@@ -260,19 +215,24 @@ func SellCoinIfNeedAndUpdateUnsold() (float64, error) {
 	max := 1234567890.0
 	lowestPrice := max
 	orderIds := []int{}
-	for _, order := range unSoldBuyOrders {
+	var res = &api.OrdersInfoResponse{}
+	for i, order := range unSoldBuyOrders {
 		orderIds = append(orderIds, order.OrderID)
-	}
-	//TODO:10�����上限として繰り返したほうが良い
-	res, err := api.GetOrdersInfo(orderIds)
-	if err != nil {
-		return -1.0, err
+		if i%5 == 0 || i == len(unSoldBuyOrders)-1 {
+			resPart, err := api.GetOrdersInfo(orderIds)
+			if err != nil {
+				return -1.0, err
+			}
+			res.Data.Orders = append(res.Data.Orders, resPart.Data.Orders...)
+			orderIds = []int{}
+		}
 	}
 
 	for _, order := range res.Data.Orders {
 		for _, unSold := range unSoldBuyOrders {
 			//当該注��の残量が��化していた場合は対応��た売り注文を投げる
 			if unSold.OrderID == order.OrderID && unSold.RemainingBuyAmount != order.RemainingAmount {
+
 				//一部約���の時に注���������通らない
 				sellAmount := unSold.RemainingBuyAmount - order.RemainingAmount
 				sellPrice := unSold.BuyPrice * (1 + config.TakeProfitRange)
@@ -282,7 +242,7 @@ func SellCoinIfNeedAndUpdateUnsold() (float64, error) {
 				}
 				_, err := api.SellCoin(sellAmount, sellPrice)
 				if err != nil {
-					fmt.Printf("a%f", sellAmount)
+					fmt.Println(unSold.RemainingBuyAmount, order.RemainingAmount)
 					return -1, err
 				}
 
@@ -299,6 +259,7 @@ func SellCoinIfNeedAndUpdateUnsold() (float64, error) {
 	if lowestPrice == max {
 		lowestPrice = -1
 	}
+
 	return lowestPrice, nil
 }
 
