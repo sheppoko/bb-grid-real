@@ -6,7 +6,7 @@ const (
 
 const (
 	CoinName                     = "xrp"
-	OrderNumInOnetime            = 3
+	OrderNumInOnetime            = 10
 	UnSoldBuyPositionLogFileName = "unsold_buy_position.json"
 	SecJsonFileName              = "sec.json"
 )
