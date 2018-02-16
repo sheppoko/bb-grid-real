@@ -12,8 +12,8 @@ const (
 )
 
 var (
-	BuyRange               = 0.003
-	TakeProfitRange        = 0.003
-	MaxPositionCount       = 119
-	PositionMaxDownPercent = 30.0
+	BuyRange               = 0.01
+	TakeProfitRange        = 0.01
+	MaxPositionCount       = 30
+	PositionMaxDownPercent = 20.0
 )

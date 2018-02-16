@@ -36,6 +36,7 @@ func StartStrategy() {
 				continue
 			}
 		}
+		return
 		counter++
 
 		_, err := SellCoinIfNeedAndUpdateUnsold()
@@ -66,51 +67,126 @@ func initCache() {
 
 func SetRangeFromCandle() error {
 
-	candle, errCandle := api.GetCandle(time.Now().AddDate(0, 0, -2))
-	if errCandle != nil {
-		return errCandle
+	candle, _ := api.GetCandle(time.Now().AddDate(0, 0, -260))
+	for i := 0; i < 180; i++ {
+		candlePart, e := api.GetCandle(time.Now().AddDate(0, 0, -261+i))
+		if e != nil {
+			fmt.Println(e)
+		}
+		candle.Data.Candlestick[0].Ohlcv = append(candle.Data.Candlestick[0].Ohlcv, candlePart.Data.Candlestick[0].Ohlcv...)
 	}
-	bestEstimatePercent := 0.0
+
+	bestMoney := 0.0
 	bestRange := 0.0
 	bestMaxPosition := 0.0
-	bestCounter := 0.0
-	for buyRange := 0.0001; buyRange < 0.01; buyRange = buyRange + 0.0001 {
-
-		simCounter := 0.0
+	bestTakeProfitCounter := 0
+	songiriCounter := 0
+	for buyRange := 0.001; buyRange < 0.01; buyRange = buyRange + 0.001 {
+		songiriCounter = 0
+		maxHigh := 0.0
+		money := 1000000.0
 		shouldUpdateLow := false
 		basePrice, _ := util.StringToFloat(candle.Data.Candlestick[0].Ohlcv[0][2].(string))
+		positions := []float64{basePrice}
+		maxPosition := MaxPositionFromRange(buyRange)
+		takeProfitCounter := 0
+		profitPercentPerTime := (1 / maxPosition) * buyRange
 		for _, data := range candle.Data.Candlestick[0].Ohlcv {
 			//今回の足で利益を取っていたら計測基準を次の足の安値にする
 			high, _ := util.StringToFloat(data[1].(string))
 			low, _ := util.StringToFloat(data[2].(string))
 
+			if maxHigh < high {
+				maxHigh = high
+			}
 			if shouldUpdateLow {
 				basePrice = low
 			}
 			if basePrice > low {
 				basePrice = low
 			}
-			if ((high-basePrice)/basePrice)*0.5 > buyRange {
-				simCounter += float64(int64(((high - basePrice) / basePrice) * 0.75 / buyRange))
-				shouldUpdateLow = true
+			if maxHigh*(100-config.PositionMaxDownPercent)/100 > low {
+				money = money * (100 - (config.PositionMaxDownPercent / 2)) / 100
+				positions = []float64{low}
+				fmt.Println("損切り", low, "追加")
+				maxHigh = low
+				songiriCounter++
 			}
+			hajime, _ := util.StringToFloat(data[0].(string))
+			owari, _ := util.StringToFloat(data[3].(string))
+			isYosen := hajime < owari
+			nPos := positions
+
+			if isYosen {
+				start := positions[len(positions)-1] * (1 - buyRange)
+				for i := start; i > low; i = i * (1 - buyRange) {
+					fmt.Println(low, i, "追加")
+					positions = append(positions, i)
+				}
+
+				for _, p := range positions {
+					if p*(1+buyRange) < high {
+						fmt.Println(high, p, "売却")
+						money = money * (1 + profitPercentPerTime)
+						nPos = remove(positions, p)
+						takeProfitCounter++
+					}
+				}
+				positions = nPos
+				if len(positions) == 0 {
+					fmt.Println("成行", high, "追加")
+					positions = append(positions, high)
+				}
+			} else {
+				for _, p := range positions {
+					if p*(1+buyRange) < high {
+						fmt.Println(high, p, "売却")
+						money = money * (1 + profitPercentPerTime)
+						nPos = remove(positions, p)
+						takeProfitCounter++
+					}
+				}
+				positions = nPos
+				if len(positions) == 0 {
+					fmt.Println("成行", high, "追加")
+					positions = append(positions, high)
+				}
+				start := positions[len(positions)-1] * (1 - buyRange)
+				for i := start; i > low; i = i * (1 - buyRange) {
+					fmt.Println(low, i, "追加")
+					positions = append(positions, i)
+				}
+			}
+
+			// if ((high-basePrice)/basePrice)*0.75 > buyRange && isYosen {
+			// 	simCounter += float64(int64(((high - basePrice) / basePrice) * 0.75 / buyRange))
+			// 	money = money * (1 + profitPercentPerTime)
+			// 	shouldUpdateLow = true
+			// }
 		}
-		maxPosition := MaxPositionFromRange(buyRange)
-		profitPercentPerTime := (1 / maxPosition) * buyRange
-		estimatePercent := (profitPercentPerTime * simCounter) * 100
-		if estimatePercent > bestEstimatePercent {
-			bestEstimatePercent = estimatePercent
+
+		if money > bestMoney {
 			bestRange = buyRange
-			bestMaxPosition = maxPosition
-			bestCounter = simCounter
+			bestMoney = money
+			bestTakeProfitCounter = takeProfitCounter
 		}
 	}
 	config.BuyRange = bestRange
 	config.TakeProfitRange = bestRange
 	config.MaxPositionCount = int(bestMaxPosition)
-	fmt.Printf("期待日利:%f(%f幅,%f回利益確定,%fポジション数)に設定されました\n", bestEstimatePercent, bestRange, bestCounter, bestMaxPosition)
+	fmt.Printf("%f,%f,%d,%d\n", bestMoney, bestRange, bestTakeProfitCounter, songiriCounter)
 	return nil
 
+}
+
+func remove(numbers []float64, search float64) []float64 {
+	result := []float64{}
+	for _, num := range numbers {
+		if num != search {
+			result = append(result, num)
+		}
+	}
+	return result
 }
 
 func MaxPositionFromRange(buyRange float64) float64 {
@@ -252,7 +328,7 @@ func SellCoinIfNeedAndUpdateUnsold() (float64, error) {
 					unSold.RemainingBuyAmount -= sellAmount
 				}
 				util.SaveJsonToFile(unSoldBuyOrders, config.UnSoldBuyPositionLogFileName)
-				fmt.Println("作成しました")
+				fmt.Println("作成しま����た")
 			}
 		}
 	}
