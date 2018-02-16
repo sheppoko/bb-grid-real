@@ -36,7 +36,7 @@ func StartStrategy() {
 				continue
 			}
 		}
-		return
+
 		counter++
 
 		_, err := SellCoinIfNeedAndUpdateUnsold()
