@@ -227,19 +227,12 @@ func LoadUnSoldStatus() (bool, error) {
 //一番安い売り注文か現在最良Askの高い方から2段階下げた買い注文を起点に5個入れます
 //1つずつ値計算し、類似価格の注文がある場合は飛ばします
 func OrderIfNeed(nowPositionNum int) error {
-	lowestSell, err := GetLowestSellOrderPrice()
-	if err != nil {
-		return err
-	}
 	board, errB := api.GetBoard()
 	if errB != nil {
 		return errB
 	}
 	boardPrice, _ := util.StringToFloat(board.Data.Asks[0][0])
-	startPrice := (lowestSell / (1 + config.TakeProfitRange)) * (1 - config.BuyRange)
-	if lowestSell < boardPrice {
-		startPrice = boardPrice * (1 - config.BuyRange)
-	}
+	startPrice := boardPrice * (1 - config.BuyRange)
 	orderNum := config.MaxPositionCount - nowPositionNum
 	buyMax := orderNum
 	if buyMax >= config.OrderNumInOnetime {
