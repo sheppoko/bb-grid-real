@@ -27,7 +27,7 @@ func StartStrategy() {
 	for {
 		time.Sleep(1000 * time.Millisecond) // 休む
 		initCache()
-		if counter%60 == 0 && false {
+		if counter%60 == 0 {
 			counter = 0
 			errCandle := SetRangeFromCandle()
 			if errCandle != nil {
@@ -67,9 +67,9 @@ func initCache() {
 
 func SetRangeFromCandle() error {
 
-	candle, _ := api.GetCandle(time.Now().AddDate(0, 0, -260))
-	for i := 0; i < 180; i++ {
-		candlePart, e := api.GetCandle(time.Now().AddDate(0, 0, -261+i))
+	candle, _ := api.GetCandle(time.Now().AddDate(0, 0, -1))
+	for i := 2; i < 6; i++ {
+		candlePart, e := api.GetCandle(time.Now().AddDate(0, 0, -1-i))
 		if e != nil {
 			fmt.Println(e)
 		}
@@ -81,7 +81,7 @@ func SetRangeFromCandle() error {
 	bestMaxPosition := 0.0
 	bestTakeProfitCounter := 0
 	songiriCounter := 0
-	for buyRange := 0.001; buyRange < 0.01; buyRange = buyRange + 0.001 {
+	for buyRange := 0.001; buyRange < 0.05; buyRange = buyRange + 0.0005 {
 		songiriCounter = 0
 		maxHigh := 0.0
 		money := 1000000.0
@@ -168,13 +168,14 @@ func SetRangeFromCandle() error {
 		if money > bestMoney {
 			bestRange = buyRange
 			bestMoney = money
+			bestMaxPosition = maxPosition
 			bestTakeProfitCounter = takeProfitCounter
 		}
 	}
 	config.BuyRange = bestRange
 	config.TakeProfitRange = bestRange
 	config.MaxPositionCount = int(bestMaxPosition)
-	fmt.Printf("%f,%f,%d,%d\n", bestMoney, bestRange, bestTakeProfitCounter, songiriCounter)
+	fmt.Printf("%f,%f,%f,%d,%d\n", bestMaxPosition, bestMoney, bestRange, bestTakeProfitCounter, songiriCounter)
 	return nil
 
 }
