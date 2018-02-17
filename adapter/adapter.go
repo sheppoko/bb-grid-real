@@ -235,6 +235,9 @@ func OrderIfNeed(nowPositionNum int) error {
 	if lowestSell < boardPrice {
 		startPrice = (boardPrice / (1 + config.TakeProfitRange))
 	}
+	if nowPositionNum == 0 {
+		startPrice = boardPrice
+	}
 	orderNum := config.MaxPositionCount - nowPositionNum
 	buyMax := orderNum
 	if buyMax >= config.OrderNumInOnetime {
