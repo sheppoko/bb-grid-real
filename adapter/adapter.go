@@ -238,7 +238,7 @@ func OrderIfNeed(nowPositionNum int) error {
 	boardPrice, _ := util.StringToFloat(board.Data.Asks[0][0])
 	startPrice := (lowestSell / (1 + config.TakeProfitRange)) * (1 - config.BuyRange)
 	if lowestSell < boardPrice {
-		startPrice = (boardPrice / (1 + config.TakeProfitRange))
+		startPrice = boardPrice * (1 - config.BuyRange)
 	}
 	orderNum := config.MaxPositionCount - nowPositionNum
 	buyMax := orderNum
