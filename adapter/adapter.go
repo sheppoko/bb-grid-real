@@ -36,7 +36,6 @@ func StartStrategy() {
 				continue
 			}
 		}
-
 		counter++
 
 		_, err := SellCoinIfNeedAndUpdateUnsold()
@@ -68,20 +67,21 @@ func initCache() {
 func SetRangeFromCandle() error {
 
 	candle, _ := api.GetCandle(time.Now().AddDate(0, 0, -1))
-	for i := 2; i < 6; i++ {
-		candlePart, e := api.GetCandle(time.Now().AddDate(0, 0, -1-i))
-		if e != nil {
-			fmt.Println(e)
-		}
-		candle.Data.Candlestick[0].Ohlcv = append(candle.Data.Candlestick[0].Ohlcv, candlePart.Data.Candlestick[0].Ohlcv...)
-	}
+	// for i := 2; i < 6; i++ {
+	// 	candlePart, e := api.GetCandle(time.Now().AddDate(0, 0, -1-i))
+	// 	if e != nil {
+	// 		fmt.Println(e)
+	// 	}
+	// 	candle.Data.Candlestick[0].Ohlcv = append(candle.Data.Candlestick[0].Ohlcv, candlePart.Data.Candlestick[0].Ohlcv...)
+	// }
 
 	bestMoney := 0.0
 	bestRange := 0.0
 	bestMaxPosition := 0.0
 	bestTakeProfitCounter := 0
 	songiriCounter := 0
-	for buyRange := 0.001; buyRange < 0.05; buyRange = buyRange + 0.0005 {
+	for tp := 0.001; tp < 0.05; tp = tp + 0.0005 {
+		buyRange := 0.0001
 		songiriCounter = 0
 		maxHigh := 0.0
 		money := 1000000.0
@@ -90,9 +90,8 @@ func SetRangeFromCandle() error {
 		positions := []float64{basePrice}
 		maxPosition := MaxPositionFromRange(buyRange)
 		takeProfitCounter := 0
-		profitPercentPerTime := (1 / maxPosition) * buyRange
+		profitPercentPerTime := (1 / maxPosition) * tp
 		for _, data := range candle.Data.Candlestick[0].Ohlcv {
-			//今回の足で利益を取っていたら計測基準を次の足の安値にする
 			high, _ := util.StringToFloat(data[1].(string))
 			low, _ := util.StringToFloat(data[2].(string))
 
@@ -108,7 +107,7 @@ func SetRangeFromCandle() error {
 			if maxHigh*(100-config.PositionMaxDownPercent)/100 > low {
 				money = money * (100 - (config.PositionMaxDownPercent / 2)) / 100
 				positions = []float64{low}
-				fmt.Println("損切り", low, "追加")
+				// fmt.Println("損切り", low, "追加")
 				maxHigh = low
 				songiriCounter++
 			}
@@ -118,15 +117,15 @@ func SetRangeFromCandle() error {
 			nPos := positions
 
 			if isYosen {
-				start := positions[len(positions)-1] * (1 - buyRange)
+				start := lowest(positions) * (1 - buyRange)
 				for i := start; i > low; i = i * (1 - buyRange) {
-					fmt.Println(low, i, "追加")
+					//fmt.Println(low, i, "追加")
 					positions = append(positions, i)
 				}
 
 				for _, p := range positions {
-					if p*(1+buyRange) < high {
-						fmt.Println(high, p, "売却")
+					if p*(1+tp) < high {
+						// fmt.Println(high, p, "売却")
 						money = money * (1 + profitPercentPerTime)
 						nPos = remove(positions, p)
 						takeProfitCounter++
@@ -134,13 +133,13 @@ func SetRangeFromCandle() error {
 				}
 				positions = nPos
 				if len(positions) == 0 {
-					fmt.Println("成行", high, "追加")
+					// fmt.Println("成行", high, "追加")
 					positions = append(positions, high)
 				}
 			} else {
 				for _, p := range positions {
-					if p*(1+buyRange) < high {
-						fmt.Println(high, p, "売却")
+					if p*(1+tp) < high {
+						// fmt.Println(high, p, "売却")
 						money = money * (1 + profitPercentPerTime)
 						nPos = remove(positions, p)
 						takeProfitCounter++
@@ -148,12 +147,12 @@ func SetRangeFromCandle() error {
 				}
 				positions = nPos
 				if len(positions) == 0 {
-					fmt.Println("成行", high, "追加")
+					// fmt.Println("成行", high, "追加")
 					positions = append(positions, high)
 				}
-				start := positions[len(positions)-1] * (1 - buyRange)
+				start := lowest(positions) * (1 - buyRange)
 				for i := start; i > low; i = i * (1 - buyRange) {
-					fmt.Println(low, i, "追加")
+					// fmt.Println(low, i, "追加")
 					positions = append(positions, i)
 				}
 			}
@@ -166,15 +165,12 @@ func SetRangeFromCandle() error {
 		}
 
 		if money > bestMoney {
-			bestRange = buyRange
+			bestRange = tp
 			bestMoney = money
 			bestMaxPosition = maxPosition
 			bestTakeProfitCounter = takeProfitCounter
 		}
 	}
-	config.BuyRange = bestRange
-	config.TakeProfitRange = bestRange
-	config.MaxPositionCount = int(bestMaxPosition)
 	fmt.Printf("%f,%f,%f,%d,%d\n", bestMaxPosition, bestMoney, bestRange, bestTakeProfitCounter, songiriCounter)
 	return nil
 
@@ -188,6 +184,19 @@ func remove(numbers []float64, search float64) []float64 {
 		}
 	}
 	return result
+}
+
+func lowest(numbers []float64) float64 {
+	tempLow := 1234567890.0
+	for _, num := range numbers {
+		if num < tempLow {
+			tempLow = num
+		}
+	}
+	if tempLow == 1234567890.0 {
+		tempLow = 0
+	}
+	return tempLow
 }
 
 func MaxPositionFromRange(buyRange float64) float64 {
