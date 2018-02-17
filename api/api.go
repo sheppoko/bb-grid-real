@@ -212,7 +212,7 @@ func GetFreeJPY() (float64, error) {
 	}
 	for _, asset := range assets.Data.Assets {
 		if asset.Asset == "jpy" {
-			return asset.FreeAmount, nil
+			return asset.OnhandAmount, nil
 		}
 	}
 	return 0.0, nil
