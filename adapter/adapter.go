@@ -288,21 +288,6 @@ func BuyCoinAndRegistUnsold(amount float64, price float64) (bool, error) {
 	unSoldBuyOrders = append(unSoldBuyOrders, appendOrder)
 	util.SaveJsonToFile(unSoldBuyOrders, config.UnSoldBuyPositionLogFileName)
 
-	if len(unSoldBuyOrders) > config.OrderNumInOnetime+10 {
-		tmpLow := 1234567890.0
-		cancelOrderId := 0
-		for _, unSold := range unSoldBuyOrders {
-			if tmpLow > unSold.BuyPrice {
-				tmpLow = unSold.BuyPrice
-				cancelOrderId = unSold.OrderID
-			}
-		}
-		_, err := api.CancelOrders([]int{cancelOrderId})
-		if err == nil {
-			unSoldBuyOrders = DeleteUnSoldOrder(cancelOrderId)
-			util.SaveJsonToFile(unSoldBuyOrders, config.UnSoldBuyPositionLogFileName)
-		}
-	}
 	return true, nil
 }
 
