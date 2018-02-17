@@ -67,7 +67,7 @@ func initCache() {
 func SetRangeFromCandle() error {
 
 	candle, _ := api.GetCandle(time.Now().AddDate(0, 0, -1))
-	// for i := 2; i < 6; i++ {
+	// for i := 1; i < 3; i++ {
 	// 	candlePart, e := api.GetCandle(time.Now().AddDate(0, 0, -1-i))
 	// 	if e != nil {
 	// 		fmt.Println(e)
@@ -75,21 +75,20 @@ func SetRangeFromCandle() error {
 	// 	candle.Data.Candlestick[0].Ohlcv = append(candle.Data.Candlestick[0].Ohlcv, candlePart.Data.Candlestick[0].Ohlcv...)
 	// }
 
-	bestMoney := 0.0
 	bestRange := 0.0
 	bestMaxPosition := 0.0
-	bestTakeProfitCounter := 0
+	bestTakeProfitCounter := 0.0
+	bestCounter := 0
 	songiriCounter := 0
-	for tp := 0.001; tp < 0.05; tp = tp + 0.0005 {
-		buyRange := 0.0001
+	for tp := 0.001; tp < 0.02; tp = tp + 0.001 {
+		buyRange := 0.00001
 		songiriCounter = 0
 		maxHigh := 0.0
-		money := 1000000.0
-		shouldUpdateLow := false
 		basePrice, _ := util.StringToFloat(candle.Data.Candlestick[0].Ohlcv[0][2].(string))
 		positions := []float64{basePrice}
 		maxPosition := MaxPositionFromRange(buyRange)
-		takeProfitCounter := 0
+		takeProfitCounter := 0.0
+		counter := 0
 		profitPercentPerTime := (1 / maxPosition) * tp
 		for _, data := range candle.Data.Candlestick[0].Ohlcv {
 			high, _ := util.StringToFloat(data[1].(string))
@@ -98,14 +97,9 @@ func SetRangeFromCandle() error {
 			if maxHigh < high {
 				maxHigh = high
 			}
-			if shouldUpdateLow {
-				basePrice = low
-			}
-			if basePrice > low {
-				basePrice = low
-			}
+
 			if maxHigh*(100-config.PositionMaxDownPercent)/100 > low {
-				money = money * (100 - (config.PositionMaxDownPercent / 2)) / 100
+				takeProfitCounter = ((1 + takeProfitCounter) * (100 - (config.PositionMaxDownPercent / 2)) / 100) - 1
 				positions = []float64{low}
 				// fmt.Println("損切り", low, "追加")
 				maxHigh = low
@@ -119,16 +113,17 @@ func SetRangeFromCandle() error {
 			if isYosen {
 				start := lowest(positions) * (1 - buyRange)
 				for i := start; i > low; i = i * (1 - buyRange) {
-					//fmt.Println(low, i, "追加")
+					// fmt.Println(low, i, "追加")
 					positions = append(positions, i)
+
 				}
 
 				for _, p := range positions {
 					if p*(1+tp) < high {
 						// fmt.Println(high, p, "売却")
-						money = money * (1 + profitPercentPerTime)
+						takeProfitCounter = takeProfitCounter + profitPercentPerTime
+						counter++
 						nPos = remove(positions, p)
-						takeProfitCounter++
 					}
 				}
 				positions = nPos
@@ -140,9 +135,9 @@ func SetRangeFromCandle() error {
 				for _, p := range positions {
 					if p*(1+tp) < high {
 						// fmt.Println(high, p, "売却")
-						money = money * (1 + profitPercentPerTime)
+						takeProfitCounter = takeProfitCounter + profitPercentPerTime
+						counter++
 						nPos = remove(positions, p)
-						takeProfitCounter++
 					}
 				}
 				positions = nPos
@@ -164,14 +159,14 @@ func SetRangeFromCandle() error {
 			// }
 		}
 
-		if money > bestMoney {
+		if takeProfitCounter > bestTakeProfitCounter {
 			bestRange = tp
-			bestMoney = money
 			bestMaxPosition = maxPosition
+			bestCounter = counter
 			bestTakeProfitCounter = takeProfitCounter
 		}
 	}
-	fmt.Printf("%f,%f,%f,%d,%d\n", bestMaxPosition, bestMoney, bestRange, bestTakeProfitCounter, songiriCounter)
+	fmt.Printf("ポジション数:%f,レンジ：%f,利益:%f,利益確定回数:%d,損切り:%d", bestMaxPosition, bestRange, bestTakeProfitCounter, bestCounter, songiriCounter)
 	return nil
 
 }
@@ -292,6 +287,22 @@ func BuyCoinAndRegistUnsold(amount float64, price float64) (bool, error) {
 	appendOrder.RemainingBuyAmount = res.Data.RemainingAmount
 	unSoldBuyOrders = append(unSoldBuyOrders, appendOrder)
 	util.SaveJsonToFile(unSoldBuyOrders, config.UnSoldBuyPositionLogFileName)
+
+	if len(unSoldBuyOrders) > config.OrderNumInOnetime {
+		tmpLow := 1234567890.0
+		cancelOrderId := 0
+		for _, unSold := range unSoldBuyOrders {
+			if tmpLow > unSold.BuyPrice {
+				tmpLow = unSold.BuyPrice
+				cancelOrderId = unSold.OrderID
+			}
+		}
+		_, err := api.CancelOrders([]int{cancelOrderId})
+		if err == nil {
+			unSoldBuyOrders = DeleteUnSoldOrder(cancelOrderId)
+			util.SaveJsonToFile(unSoldBuyOrders, config.UnSoldBuyPositionLogFileName)
+		}
+	}
 	return true, nil
 }
 
@@ -304,7 +315,7 @@ func SellCoinIfNeedAndUpdateUnsold() (float64, error) {
 	var res = &api.OrdersInfoResponse{}
 	for i, order := range unSoldBuyOrders {
 		orderIds = append(orderIds, order.OrderID)
-		if i%5 == 0 || i == len(unSoldBuyOrders)-1 {
+		if i%10 == 0 || i == len(unSoldBuyOrders)-1 {
 			resPart, err := api.GetOrdersInfo(orderIds)
 			if err != nil {
 				return -1.0, err
