@@ -11,10 +11,17 @@ import (
 	"time"
 )
 
+//
 type UnsoldBuyOrder struct {
 	OrderID            int     `json:"order_id"`
 	BuyPrice           float64 `json:"buy_price"`
 	RemainingBuyAmount float64 `json:"remaining_buy_amount"`
+}
+
+//キャンセルしてしまった売りオーダ
+type CanceldSellOrder struct {
+	Price  float64 `json:"buy_price"`
+	Amount float64 `json:"amount"`
 }
 
 var unSoldBuyOrders = []*UnsoldBuyOrder{}
@@ -66,31 +73,45 @@ func initCache() {
 
 func SetRangeFromCandle() error {
 
-	candle, _ := api.GetCandle(time.Now().AddDate(0, 0, -1))
-	// for i := 1; i < 3; i++ {
-	// 	candlePart, e := api.GetCandle(time.Now().AddDate(0, 0, -1-i))
-	// 	if e != nil {
-	// 		fmt.Println(e)
-	// 	}
-	// 	candle.Data.Candlestick[0].Ohlcv = append(candle.Data.Candlestick[0].Ohlcv, candlePart.Data.Candlestick[0].Ohlcv...)
-	// }
+	baseDateDiff := -1
+	dateNum := 0
+	candle, _ := api.GetCandle(time.Now().AddDate(0, 0, baseDateDiff))
+	for i := 1; i < dateNum; i++ {
+		candlePart, e := api.GetCandle(time.Now().AddDate(0, 0, baseDateDiff-1-i))
+		fmt.Println(time.Now().AddDate(0, 0, baseDateDiff-1-i))
+		if e != nil {
+			fmt.Println(e)
+		}
+		fmt.Println("recieve candle", i+1)
+		candle.Data.Candlestick[0].Ohlcv = append(candle.Data.Candlestick[0].Ohlcv, candlePart.Data.Candlestick[0].Ohlcv...)
+	}
 
 	bestRange := 0.0
 	bestMaxPosition := 0.0
+	bestTpCounters := []int{}
 	bestTakeProfitCounter := 0.0
 	bestCounter := 0
 	songiriCounter := 0
-	for tp := 0.001; tp < 0.02; tp = tp + 0.001 {
-		buyRange := 0.00001
+	for tp := 0.007; tp < 0.0071; tp = tp + 0.001 {
+
+		buyRange := tp
 		songiriCounter = 0
 		maxHigh := 0.0
 		basePrice, _ := util.StringToFloat(candle.Data.Candlestick[0].Ohlcv[0][2].(string))
 		positions := []float64{basePrice}
-		maxPosition := MaxPositionFromRange(buyRange)
-		takeProfitCounter := 0.0
+		maxPosition := MaxPositionFromRange(buyRange) - 1
+		money := 1000000.0
+		tpCounters := []int{}
+		tpCounter := 0
 		counter := 0
 		profitPercentPerTime := (1 / maxPosition) * tp
-		for _, data := range candle.Data.Candlestick[0].Ohlcv {
+
+		for j, data := range candle.Data.Candlestick[0].Ohlcv {
+			round := j % (24 * 60)
+			if round == 24*60-1 {
+				tpCounters = append(tpCounters, tpCounter)
+				tpCounter = 0
+			}
 			high, _ := util.StringToFloat(data[1].(string))
 			low, _ := util.StringToFloat(data[2].(string))
 
@@ -99,7 +120,8 @@ func SetRangeFromCandle() error {
 			}
 
 			if maxHigh*(100-config.PositionMaxDownPercent)/100 > low {
-				takeProfitCounter = ((1 + takeProfitCounter) * (100 - (config.PositionMaxDownPercent / 2)) / 100) - 1
+				av := average(positions)
+				money *= low * 0.997 / av
 				positions = []float64{low}
 				// fmt.Println("損切り", low, "追加")
 				maxHigh = low
@@ -112,30 +134,44 @@ func SetRangeFromCandle() error {
 
 			if isYosen {
 				start := lowest(positions) * (1 - buyRange)
+				add := false
 				for i := start; i > low; i = i * (1 - buyRange) {
-					// fmt.Println(low, i, "追加")
-					positions = append(positions, i)
+					//fmt.Println(low, i, "追加")
+					nPos = append(nPos, i)
+					add = true
 
 				}
-
+				positions = nPos
+				if add {
+					//fmt.Println(low)
+				}
+				sell := false
 				for _, p := range positions {
 					if p*(1+tp) < high {
 						// fmt.Println(high, p, "売却")
-						takeProfitCounter = takeProfitCounter + profitPercentPerTime
+						tpCounter++
+						money += 1000000 * (profitPercentPerTime + 0.0000/maxPosition)
 						counter++
-						nPos = remove(positions, p)
+						sell = true
+						nPos = remove(nPos, p)
 					}
+				}
+
+				if sell {
+					// fmt.Println(high)
 				}
 				positions = nPos
 				if len(positions) == 0 {
 					// fmt.Println("成行", high, "追加")
-					positions = append(positions, high)
+					positions = append(positions, high*1.01)
 				}
 			} else {
+				nPos = positions
 				for _, p := range positions {
 					if p*(1+tp) < high {
 						// fmt.Println(high, p, "売却")
-						takeProfitCounter = takeProfitCounter + profitPercentPerTime
+						tpCounter++
+						money += 1000000 * (profitPercentPerTime + 0.0000/maxPosition)
 						counter++
 						nPos = remove(positions, p)
 					}
@@ -143,7 +179,7 @@ func SetRangeFromCandle() error {
 				positions = nPos
 				if len(positions) == 0 {
 					// fmt.Println("成行", high, "追加")
-					positions = append(positions, high)
+					positions = append(positions, high*1.01)
 				}
 				start := lowest(positions) * (1 - buyRange)
 				for i := start; i > low; i = i * (1 - buyRange) {
@@ -151,7 +187,6 @@ func SetRangeFromCandle() error {
 					positions = append(positions, i)
 				}
 			}
-
 			// if ((high-basePrice)/basePrice)*0.75 > buyRange && isYosen {
 			// 	simCounter += float64(int64(((high - basePrice) / basePrice) * 0.75 / buyRange))
 			// 	money = money * (1 + profitPercentPerTime)
@@ -159,26 +194,46 @@ func SetRangeFromCandle() error {
 			// }
 		}
 
-		if takeProfitCounter > bestTakeProfitCounter {
+		if money > bestTakeProfitCounter {
+			bestTpCounters = tpCounters
 			bestRange = tp
 			bestMaxPosition = maxPosition
 			bestCounter = counter
-			bestTakeProfitCounter = takeProfitCounter
+			bestTakeProfitCounter = money
 		}
 	}
-	fmt.Printf("ポジション数:%f,レンジ：%f,利益:%f,利益確定回数:%d,損切り:%d", bestMaxPosition, bestRange, bestTakeProfitCounter, bestCounter, songiriCounter)
+	profitPerTime := 1.0 + (float64(bestTakeProfitCounter)-1000000.0)/float64(bestCounter)/1000000
+	fukuri := math.Pow(profitPerTime, float64(bestCounter))
+	fukuriMoney := 1000000 * fukuri
+	yearFukuri := math.Pow(fukuri, 365/float64(dateNum))
+	util.PrettyPrint(bestTpCounters)
+	fmt.Printf("ポジション数:%f,レンジ：%f,利益:%f,利益確定回数:%d,全複利:%f,年間期待:%f,損切り:%d", bestMaxPosition, bestRange, bestTakeProfitCounter, bestCounter, fukuriMoney, yearFukuri, songiriCounter)
 	return nil
 
 }
 
 func remove(numbers []float64, search float64) []float64 {
+	success := false
 	result := []float64{}
 	for _, num := range numbers {
 		if num != search {
 			result = append(result, num)
+		} else {
+			success = true
 		}
 	}
+	if !success {
+		fmt.Println("削除失敗")
+	}
 	return result
+}
+
+func average(numbers []float64) float64 {
+	sum := 0.0
+	for _, num := range numbers {
+		sum += num
+	}
+	return sum / float64(len(numbers))
 }
 
 func lowest(numbers []float64) float64 {
@@ -239,6 +294,9 @@ func OrderIfNeed(nowPositionNum int) error {
 		startPrice = boardPrice
 	}
 	orderNum := config.MaxPositionCount - nowPositionNum
+	if orderNum == 0 {
+		return nil
+	}
 	buyMax := orderNum
 	if buyMax >= config.OrderNumInOnetime {
 		buyMax = config.OrderNumInOnetime
@@ -256,7 +314,10 @@ func OrderIfNeed(nowPositionNum int) error {
 			}
 			useJpy := freeJpy / float64(orderNum)
 			amount := useJpy / p
-			BuyCoinAndRegistUnsold(amount, p)
+			_, errBuy := BuyCoinAndRegistUnsold(amount, p)
+			if errBuy != nil {
+				return errBuy
+			}
 		} else {
 			continue
 		}
@@ -301,6 +362,7 @@ func SellCoinIfNeedAndUpdateUnsold() (float64, error) {
 	lowestPrice := max
 	orderIds := []int{}
 	var res = &api.OrdersInfoResponse{}
+
 	for i, order := range unSoldBuyOrders {
 		orderIds = append(orderIds, order.OrderID)
 		if i%10 == 0 || i == len(unSoldBuyOrders)-1 {
@@ -336,6 +398,7 @@ func SellCoinIfNeedAndUpdateUnsold() (float64, error) {
 				} else {
 					unSold.RemainingBuyAmount -= sellAmount
 				}
+
 				util.SaveJsonToFile(unSoldBuyOrders, config.UnSoldBuyPositionLogFileName)
 				fmt.Println("作成しま����た")
 			}
@@ -428,6 +491,64 @@ func GetSellPriceKindNum() (int, error) {
 	return len(prices), nil
 }
 
+func CancelSurplusOrder() error {
+
+	activeOrders, errO := GetActiveOrdersFromAPIorCache()
+	if errO != nil {
+		return errO
+	}
+
+	buyOrderNum, err := GetBuyOrderNum()
+	if err != nil {
+		return err
+	}
+	sellOrderNum, errS := GetSellOrderNum()
+	if errS != nil {
+		return errS
+	}
+	if buyOrderNum > config.OrderNumInOnetime {
+		mostLow := 1234567890.0
+		mostLowOrderId := 0
+		for _, order := range activeOrders.Data.Orders {
+			if order.Side == "buy" {
+				if mostLow > order.Price {
+					mostLow = order.Price
+					mostLowOrderId = order.OrderID
+				}
+			}
+		}
+		if mostLowOrderId != 0 {
+			_, err := api.CancelOrders([]int{mostLowOrderId})
+			if err != nil {
+				return err
+			}
+			unSoldBuyOrders = DeleteUnSoldOrder(mostLowOrderId)
+		}
+	}
+
+	if sellOrderNum > config.OrderNumInOnetime {
+		mostHigh := 0.0
+		mostHighOrderId := 0
+		for _, order := range activeOrders.Data.Orders {
+			if order.Side == "sell" {
+				if mostHigh < order.Price {
+					mostHigh = order.Price
+					mostHighOrderId = order.OrderID
+				}
+			}
+		}
+		if mostHighOrderId != 0 {
+			_, err := api.CancelOrders([]int{mostHighOrderId})
+			if err != nil {
+				return err
+			}
+			//TODO 売り注文キャンセルしたのでunSoldBuyOrder復元しないといけない・・・
+		}
+	}
+
+	return nil
+}
+
 func GetBuyOrderNum() (int, error) {
 	ret := 0
 	res, err := GetActiveOrdersFromAPIorCache()
@@ -436,6 +557,19 @@ func GetBuyOrderNum() (int, error) {
 	}
 	for _, order := range res.Data.Orders {
 		if order.Side == "buy" {
+			ret++
+		}
+	}
+	return ret, nil
+}
+func GetSellOrderNum() (int, error) {
+	ret := 0
+	res, err := GetActiveOrdersFromAPIorCache()
+	if err != nil {
+		return 0, err
+	}
+	for _, order := range res.Data.Orders {
+		if order.Side == "sell" {
 			ret++
 		}
 	}
