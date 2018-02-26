@@ -34,7 +34,7 @@ func StartStrategy() {
 	for {
 		time.Sleep(1000 * time.Millisecond) // 休む
 		initCache()
-		if counter%60 == 0 && false {
+		if counter%60 == 0 {
 			counter = 0
 			errCandle := SetRangeFromCandle()
 			if errCandle != nil {
@@ -47,13 +47,12 @@ func StartStrategy() {
 
 		if counter%600 == 1 {
 			counter = 1
-			p, errM := GetMoneyIfPriceUpToFirstPosition()
-			if errM != nil {
-				fmt.Println(errM)
-			} else {
-				api.PostSlack(util.FloatToString(p) + "円")
+			err := PostInfoToSlack()
+			if err != nil {
+				fmt.Println(err)
 			}
 		}
+		return
 
 		_, err := SellCoinIfNeedAndUpdateUnsold()
 		if err != nil {
@@ -84,7 +83,7 @@ func initCache() {
 func SetRangeFromCandle() error {
 
 	baseDateDiff := -1
-	dateNum := 30
+	dateNum := 3
 	candle, _ := api.GetCandle(time.Now().AddDate(0, 0, baseDateDiff))
 	for i := 1; i < dateNum; i++ {
 		candlePart, e := api.GetCandle(time.Now().AddDate(0, 0, baseDateDiff-1-i))
@@ -284,16 +283,31 @@ func LoadUnSoldStatus() (bool, error) {
 	return true, nil
 }
 
-func GetMoneyIfPriceUpToFirstPosition() (float64, error) {
+func PostInfoToSlack() error {
 	jpy, err := api.GetFreeJPY()
 	if err != nil {
-		return 0, err
+		return err
 	}
 	jpyEstimate, errEstimate := GetMoneyIfAllSellEstablish()
 	if errEstimate != nil {
-		return 0, err
+		return errEstimate
 	}
-	return jpy + jpyEstimate, nil
+
+	coin, errCoin := api.GetHoldCoin()
+	if errCoin != nil {
+		return errCoin
+	}
+	board, errBoard := api.GetBoard()
+	if errBoard != nil {
+		return errBoard
+	}
+	boardPrice, errFloat := util.StringToFloat(board.Data.Bids[0][0])
+	if errFloat != nil {
+		return errFloat
+	}
+	estimate := coin*boardPrice + jpy
+	api.PostSlack("現在資産:" + util.FloatToString(estimate) + ",全利益確定時:" + util.FloatToString(jpyEstimate))
+	return nil
 }
 
 //一番安い売り注文か現在最良Askの高い方から2段階下げた買い注文を起点に5個入れます

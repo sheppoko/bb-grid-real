@@ -241,6 +241,20 @@ func GetFreeCoin() (float64, error) {
 	return 0.0, nil
 }
 
+//保有コインを取得します。対象コインはconfigのCoinNameを参照します
+func GetHoldCoin() (float64, error) {
+	assets, err := GetAssets()
+	if err != nil {
+		return 0.0, err
+	}
+	for _, asset := range assets.Data.Assets {
+		if asset.Asset == config.CoinName {
+			return asset.OnhandAmount, nil
+		}
+	}
+	return 0.0, nil
+}
+
 //Assetsを取得します
 func GetAssets() (*AssetsResponse, error) {
 	res, err := fetchPrivateAPI(AssetsPath, "GET", nil, &AssetsResponse{})

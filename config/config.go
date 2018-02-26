@@ -15,5 +15,5 @@ var (
 	BuyRange               = 0.018
 	TakeProfitRange        = 0.018
 	MaxPositionCount       = 38
-	PositionMaxDownPercent = 50.0
+	PositionMaxDownPercent = 25.0
 )
