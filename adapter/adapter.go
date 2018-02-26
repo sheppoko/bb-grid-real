@@ -34,7 +34,7 @@ func StartStrategy() {
 	for {
 		time.Sleep(1000 * time.Millisecond) // 休む
 		initCache()
-		if counter%60 == 0 {
+		if counter%60 == 0 && false {
 			counter = 0
 			errCandle := SetRangeFromCandle()
 			if errCandle != nil {
