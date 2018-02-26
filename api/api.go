@@ -28,6 +28,7 @@ const (
 	OrderPath             = "/v1/user/spot/order"
 	CancelOrdersPath      = "/v1/user/spot/cancel_orders"
 	OrdersInfoPath        = "/v1/user/spot/orders_info"
+	SlackWebHookEndpoint  = "https://hooks.slack.com/services/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"
 )
 
 type Sec struct {
@@ -202,6 +203,14 @@ type CancelOrdersRequest struct {
 type OrdersInfoRequest struct {
 	Pair     string `json:"pair"`
 	OrderIds []int  `json:"order_ids"`
+}
+
+func PostSlack(body string) {
+	_, err := resty.R().SetBody(`{"text": "` + body + `"}`).
+		Post(SlackWebHookEndpoint)
+	if err != nil {
+		fmt.Println(err)
+	}
 }
 
 //使用可能な日本円を取得します

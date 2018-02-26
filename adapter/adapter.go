@@ -45,6 +45,16 @@ func StartStrategy() {
 		}
 		counter++
 
+		if counter%600 == 1 {
+			counter = 1
+			p, errM := GetMoneyIfPriceUpToFirstPosition()
+			if errM != nil {
+				fmt.Println(errM)
+			} else {
+				api.PostSlack(util.FloatToString(p) + "円")
+			}
+		}
+
 		_, err := SellCoinIfNeedAndUpdateUnsold()
 		if err != nil {
 			fmt.Println("売り注文必要チェック及び売り注文作成中にエラーが発生しました")
@@ -74,7 +84,7 @@ func initCache() {
 func SetRangeFromCandle() error {
 
 	baseDateDiff := -1
-	dateNum := 0
+	dateNum := 30
 	candle, _ := api.GetCandle(time.Now().AddDate(0, 0, baseDateDiff))
 	for i := 1; i < dateNum; i++ {
 		candlePart, e := api.GetCandle(time.Now().AddDate(0, 0, baseDateDiff-1-i))
@@ -92,7 +102,7 @@ func SetRangeFromCandle() error {
 	bestTakeProfitCounter := 0.0
 	bestCounter := 0
 	songiriCounter := 0
-	for tp := 0.007; tp < 0.0071; tp = tp + 0.001 {
+	for tp := 0.001; tp < 0.0181; tp = tp + 0.001 {
 
 		buyRange := tp
 		songiriCounter = 0
@@ -272,6 +282,18 @@ func LoadUnSoldStatus() (bool, error) {
 		fmt.Println("状態を復元しました")
 	}
 	return true, nil
+}
+
+func GetMoneyIfPriceUpToFirstPosition() (float64, error) {
+	jpy, err := api.GetFreeJPY()
+	if err != nil {
+		return 0, err
+	}
+	jpyEstimate, errEstimate := GetMoneyIfAllSellEstablish()
+	if errEstimate != nil {
+		return 0, err
+	}
+	return jpy + jpyEstimate, nil
 }
 
 //一番安い売り注文か現在最良Askの高い方から2段階下げた買い注文を起点に5個入れます
@@ -571,6 +593,20 @@ func GetSellOrderNum() (int, error) {
 	for _, order := range res.Data.Orders {
 		if order.Side == "sell" {
 			ret++
+		}
+	}
+	return ret, nil
+}
+
+func GetMoneyIfAllSellEstablish() (float64, error) {
+	ret := 0.0
+	res, err := GetActiveOrdersFromAPIorCache()
+	if err != nil {
+		return 0, err
+	}
+	for _, order := range res.Data.Orders {
+		if order.Side == "sell" {
+			ret += order.RemainingAmount * order.Price
 		}
 	}
 	return ret, nil
