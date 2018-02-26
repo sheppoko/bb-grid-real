@@ -52,7 +52,6 @@ func StartStrategy() {
 				fmt.Println(err)
 			}
 		}
-		return
 
 		_, err := SellCoinIfNeedAndUpdateUnsold()
 		if err != nil {
@@ -306,7 +305,7 @@ func PostInfoToSlack() error {
 		return errFloat
 	}
 	estimate := coin*boardPrice + jpy
-	api.PostSlack("現在資産:" + util.FloatToString(estimate) + ",全利益確定時:" + util.FloatToString(jpyEstimate))
+	api.PostSlack("現在資産:" + util.FloatToString(estimate) + ",全利益確定時:" + util.FloatToString(jpyEstimate+jpy))
 	return nil
 }
 
