@@ -81,12 +81,13 @@ func initCache() {
 
 func SetRangeFromCandle() error {
 
-	baseDateDiff := -1
-	dateNum := 20
+	dateNum := 15    //シミュレーション日数
+	startDiff := -16 //開始日（本日起点）
+	baseDateDiff := startDiff
 	candle, _ := api.GetCandle(time.Now().AddDate(0, 0, baseDateDiff))
 	for i := 1; i < dateNum; i++ {
-		candlePart, e := api.GetCandle(time.Now().AddDate(0, 0, baseDateDiff-1-i))
-		fmt.Println(time.Now().AddDate(0, 0, baseDateDiff-1-i))
+		candlePart, e := api.GetCandle(time.Now().AddDate(0, 0, baseDateDiff+i))
+		fmt.Println(time.Now().AddDate(0, 0, baseDateDiff+i))
 		if e != nil {
 			fmt.Println(e)
 		}
@@ -100,7 +101,7 @@ func SetRangeFromCandle() error {
 	bestTakeProfitCounter := 0.0
 	bestCounter := 0
 	songiriCounter := 0
-	for tp := 0.001; tp < 0.06; tp = tp + 0.001 {
+	for tp := 0.01; tp < 0.011; tp = tp + 0.001 {
 
 		buyRange := tp
 		songiriCounter = 0
@@ -128,8 +129,8 @@ func SetRangeFromCandle() error {
 			}
 
 			if maxHigh*(100-config.PositionMaxDownPercent)/100 > low {
-				// av := average(positions)
-				// money *= low * 0.997 / av
+				//av := average(positions)
+				//money *= low * 0.997 / av
 				positions = []float64{low}
 				// fmt.Println("損切り", low, "追加")
 				maxHigh = low

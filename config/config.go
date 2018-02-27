@@ -5,15 +5,15 @@ const (
 )
 
 const (
-	CoinName                     = "btc"
+	CoinName                     = "mona"
 	OrderNumInOnetime            = 3
 	UnSoldBuyPositionLogFileName = "unsold_buy_position.json"
 	SecJsonFileName              = "sec.json"
 )
 
 var (
-	BuyRange               = 0.03
-	TakeProfitRange        = 0.03
-	MaxPositionCount       = 17
-	PositionMaxDownPercent = 50.0
+	BuyRange               = 0.01
+	TakeProfitRange        = 0.01
+	MaxPositionCount       = 50
+	PositionMaxDownPercent = 40.0
 )
