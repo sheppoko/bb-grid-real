@@ -6,7 +6,7 @@ const (
 
 const (
 	CoinName                     = "mona"
-	OrderNumInOnetime            = 3
+	OrderNumInOnetime            = 5
 	UnSoldBuyPositionLogFileName = "unsold_buy_position.json"
 	SecJsonFileName              = "sec.json"
 )
