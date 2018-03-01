@@ -19,8 +19,8 @@ import (
 
 const (
 	PrivateAPIEndpoint    = "https://api.bitbank.cc"
-	CandleAPIEndpointBase = "https://public.bitbank.cc/" + config.CoinName + "_jpy/candlestick/1min/"
-	BoardAPIEndpoint      = "https://public.bitbank.cc/" + config.CoinName + "_jpy/depth"
+	CandleAPIEndpointBase = "https://public.bitbank.cc/" + config.CoinName + "_" + config.CoinPairName + "/candlestick/1min/"
+	BoardAPIEndpoint      = "https://public.bitbank.cc/" + config.CoinName + "_" + config.CoinPairName + "/depth"
 	APIKey                = "71565a43-e7a8-433e-a868-e467507b3638"
 	AssetsPath            = "/v1/user/assets"
 	ActiveOrdersPath      = "/v1/user/spot/active_orders"
@@ -213,14 +213,14 @@ func PostSlack(body string) {
 	}
 }
 
-//使用可能な日本円を取得します
-func GetFreeJPY() (float64, error) {
+//使用可能なペアコインを取得します
+func GetFreePairCoin() (float64, error) {
 	assets, err := GetAssets()
 	if err != nil {
 		return 0.0, err
 	}
 	for _, asset := range assets.Data.Assets {
-		if asset.Asset == "jpy" {
+		if asset.Asset == config.CoinPairName {
 			return asset.OnhandAmount, nil
 		}
 	}
@@ -272,7 +272,7 @@ func GetAssets() (*AssetsResponse, error) {
 //未約定の注文を取得します
 func GetActiveOrders() (*ActiveOrdersResponse, error) {
 	res, err := fetchPrivateAPI(ActiveOrdersPath, "GET", &ActiveOrdersRequest{
-		Pair:  config.CoinName + "_jpy",
+		Pair:  config.CoinName + "_" + config.CoinPairName,
 		Count: 50000,
 	}, &ActiveOrdersResponse{})
 	if err != nil {
@@ -292,7 +292,7 @@ func GetOrdersInfo(orderIds []int) (*OrdersInfoResponse, error) {
 	}
 
 	res, err := fetchPrivateAPI(OrdersInfoPath, "POST", &OrdersInfoRequest{
-		Pair:     config.CoinName + "_jpy",
+		Pair:     config.CoinName + "_" + config.CoinPairName,
 		OrderIds: orderIds,
 	}, &OrdersInfoResponse{})
 	if err != nil {
@@ -310,7 +310,7 @@ func GetOrdersInfo(orderIds []int) (*OrdersInfoResponse, error) {
 func GetTradeHistory() (*TradeHistoryResponse, error) {
 	res, err := fetchPrivateAPI(TradeHistoryPath, "GET", &TradeHistoryRequest{
 		Count: 10,
-		Pair:  config.CoinName + "_jpy",
+		Pair:  config.CoinName + "_" + config.CoinPairName,
 	}, &TradeHistoryResponse{})
 	if err != nil {
 		return nil, err
@@ -324,7 +324,7 @@ func GetTradeHistory() (*TradeHistoryResponse, error) {
 
 func BuyCoin(amount float64, price float64) (*OrderResponse, error) {
 	res, err := fetchPrivateAPI(OrderPath, "POST", &OrderRequest{
-		Pair:   config.CoinName + "_jpy",
+		Pair:   config.CoinName + "_" + config.CoinPairName,
 		Amount: util.FloatToString(amount),
 		Price:  price,
 		Side:   "buy",
@@ -343,7 +343,7 @@ func BuyCoin(amount float64, price float64) (*OrderResponse, error) {
 
 func SellCoin(amount float64, price float64) (*OrderResponse, error) {
 	res, err := fetchPrivateAPI(OrderPath, "POST", &OrderRequest{
-		Pair:   config.CoinName + "_jpy",
+		Pair:   config.CoinName + "_" + config.CoinPairName,
 		Amount: util.FloatToString(amount),
 		Price:  price,
 		Side:   "sell",
@@ -400,7 +400,7 @@ func CancelOrders(orderIds []int) (*CancelOrdersResponse, error) {
 	}
 
 	res, err := fetchPrivateAPI(CancelOrdersPath, "POST", &CancelOrdersRequest{
-		Pair:     config.CoinName + "_jpy",
+		Pair:     config.CoinName + "_" + config.CoinPairName,
 		OrderIds: orderIds,
 	}, &CancelOrdersResponse{})
 	if err != nil {

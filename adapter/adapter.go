@@ -86,10 +86,10 @@ func initCache() {
 }
 
 func SetRangeFromCandle() error {
-	for lo := 30.0; lo < 90; lo = lo + 10 {
-		for st := -6; st > -7; st = st - 5 {
+	for lo := 20.0; lo < 90; lo = lo + 5 {
+		for st := -31; st > -32; st = st - 1 {
 			config.PositionMaxDownPercent = lo
-			dateNum := 5    //シミュレーション日数
+			dateNum := 30   //シミュレーション日数
 			startDiff := st //開始日（本日起点）
 			baseDateDiff := startDiff
 			candle, _ := api.GetCandle(time.Now().AddDate(0, 0, baseDateDiff))
@@ -297,11 +297,11 @@ func LoadUnSoldStatus() (bool, error) {
 }
 
 func PostInfoToSlack() error {
-	jpy, err := api.GetFreeJPY()
+	pair, err := api.GetFreePairCoin()
 	if err != nil {
 		return err
 	}
-	jpyEstimate, errEstimate := GetMoneyIfAllSellEstablish()
+	pairEstimate, errEstimate := GetMoneyIfAllSellEstablish()
 	if errEstimate != nil {
 		return errEstimate
 	}
@@ -318,8 +318,8 @@ func PostInfoToSlack() error {
 	if errFloat != nil {
 		return errFloat
 	}
-	estimate := coin*boardPrice + jpy
-	api.PostSlack("現在資産:" + util.FloatToString(estimate) + ",全利益確定時:" + util.FloatToString(jpyEstimate+jpy))
+	estimate := coin*boardPrice + pair
+	api.PostSlack("現在資産:" + util.FloatToString(estimate) + ",全利益確定時:" + util.FloatToString(pairEstimate+pair))
 	return nil
 }
 
@@ -357,12 +357,12 @@ func OrderIfNeed(nowPositionNum int) error {
 			return err
 		}
 		if !hasRangeBuyOrder {
-			freeJpy, errJpy := api.GetFreeJPY()
-			if errJpy != nil {
-				return errJpy
+			freePair, errPair := api.GetFreePairCoin()
+			if errPair != nil {
+				return errPair
 			}
-			useJpy := freeJpy / float64(orderNum)
-			amount := useJpy / p
+			usePair := freePair / float64(orderNum)
+			amount := usePair / p
 			_, errBuy := BuyCoinAndRegistUnsold(amount, p)
 			if errBuy != nil {
 				return errBuy

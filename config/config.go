@@ -5,7 +5,8 @@ const (
 )
 
 const (
-	CoinName                     = "mona"
+	CoinName                     = "ltc"
+	CoinPairName                 = "btc"
 	OrderNumInOnetime            = 5
 	UnSoldBuyPositionLogFileName = "unsold_buy_position.json"
 	SecJsonFileName              = "sec.json"
