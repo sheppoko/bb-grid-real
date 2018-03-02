@@ -67,8 +67,8 @@ func StartStrategy() {
 			fmt.Println(err)
 			continue
 		}
-		//ポジション数変化時は全ての買い注文キャンセルして発注しなおす
-		if positionNumTmp != postionNum {
+		//ポジション数変化し、ポジション0の場合は全ての買い注文キャンセルして発注しなおす
+		if positionNumTmp != postionNum && positionNumTmp == 0 {
 			CancelAllBuyOrders()
 		}
 		postionNum = positionNumTmp
@@ -87,9 +87,9 @@ func initCache() {
 
 func SetRangeFromCandle() error {
 	for lo := 20.0; lo < 90; lo = lo + 5 {
-		for st := -31; st > -32; st = st - 1 {
+		for st := -1; st > -2; st = st - 1 {
 			config.PositionMaxDownPercent = lo
-			dateNum := 30   //シミュレーション日数
+			dateNum := 1    //シミュレーション日数
 			startDiff := st //開始日（本日起点）
 			baseDateDiff := startDiff
 			candle, _ := api.GetCandle(time.Now().AddDate(0, 0, baseDateDiff))
