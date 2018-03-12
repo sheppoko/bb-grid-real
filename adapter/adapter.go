@@ -86,9 +86,9 @@ func initCache() {
 
 func SetRangeFromCandle() error {
 	for lo := 20.0; lo < 90; lo = lo + 5 {
-		for st := -15; st > -16; st = st - 1 {
+		for st := -5; st > -6; st = st - 1 {
 			config.PositionMaxDownPercent = lo
-			dateNum := 14   //シミュレーション日数
+			dateNum := 4    //シミュレーション日数
 			startDiff := st //開始日（本日起点）
 			baseDateDiff := startDiff
 			candle, _ := api.GetCandle(time.Now().AddDate(0, 0, baseDateDiff))
