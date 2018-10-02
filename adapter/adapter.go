@@ -33,7 +33,7 @@ func StartStrategy() {
 	postionNum := 0
 	counter := 0
 	for {
-		time.Sleep(1000 * time.Millisecond) // 休む
+		time.Sleep(1500 * time.Millisecond) // 休む
 		initCache()
 		if counter%60 == 0 && false {
 			counter = 0
