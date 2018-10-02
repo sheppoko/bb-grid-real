@@ -45,6 +45,7 @@ func StartStrategy() {
 			}
 		}
 		counter++
+		//return
 		if counter%600 == 1 {
 			counter = 1
 			err := PostInfoToSlack()
@@ -86,9 +87,9 @@ func initCache() {
 
 func SetRangeFromCandle() error {
 	for lo := 20.0; lo < 90; lo = lo + 5 {
-		for st := -5; st > -6; st = st - 1 {
+		for st := -29; st > -30; st = st - 1 {
 			config.PositionMaxDownPercent = lo
-			dateNum := 4    //シミュレーション日数
+			dateNum := 20   //シミュレーション日数
 			startDiff := st //開始日（本日起点）
 			baseDateDiff := startDiff
 			candle, _ := api.GetCandle(time.Now().AddDate(0, 0, baseDateDiff))
@@ -431,7 +432,7 @@ func SellCoinIfNeedAndUpdateUnsold() (float64, error) {
 				//一部約���の時に注���������通らない
 				sellAmount := unSold.RemainingBuyAmount - order.RemainingAmount
 				sellPrice := unSold.BuyPrice * (1 + config.TakeProfitRange)
-				fmt.Println("買���注文が約定しているため売り注文を作成し���す...")
+				fmt.Println("買い注文が約定しているため売り注文を作成します...")
 				if order.Price < lowestPrice {
 					lowestPrice = order.Price
 				}
