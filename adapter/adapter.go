@@ -436,9 +436,10 @@ func SellCoinIfNeedAndUpdateUnsold() (float64, error) {
 				if order.Price < lowestPrice {
 					lowestPrice = order.Price
 				}
+
 				_, err := api.SellCoin(sellAmount, sellPrice)
 				if err != nil {
-					fmt.Println(unSold.RemainingBuyAmount, order.RemainingAmount, sellPrice)
+					fmt.Println(unSold.RemainingBuyAmount, order.RemainingAmount, util.Round(sellPrice,4)
 					return -1, err
 				}
 
