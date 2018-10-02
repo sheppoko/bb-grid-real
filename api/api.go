@@ -323,6 +323,7 @@ func GetTradeHistory() (*TradeHistoryResponse, error) {
 }
 
 func BuyCoin(amount float64, price float64) (*OrderResponse, error) {
+	price = util.Round(price, 4)
 	res, err := fetchPrivateAPI(OrderPath, "POST", &OrderRequest{
 		Pair:   config.CoinName + "_" + config.CoinPairName,
 		Amount: util.FloatToString(amount),
@@ -342,6 +343,7 @@ func BuyCoin(amount float64, price float64) (*OrderResponse, error) {
 }
 
 func SellCoin(amount float64, price float64) (*OrderResponse, error) {
+	price = util.Round(price, 4)
 	res, err := fetchPrivateAPI(OrderPath, "POST", &OrderRequest{
 		Pair:   config.CoinName + "_" + config.CoinPairName,
 		Amount: util.FloatToString(amount),
