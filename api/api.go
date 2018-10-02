@@ -461,6 +461,7 @@ func fetchPrivateAPI(path string, method string, request interface{}, result int
 
 //プライベートAPI呼び出しに必要な��通の���クエストパラ���ー���������������取得します
 func nonce() string {
+	nonceIncrementalCounter += 1
 	nonce := strconv.FormatFloat(float64(time.Now().Unix()*15000)+nonceIncrementalCounter, 'f', 0, 64)
 	fmt.Println(nonce)
 	return nonce
