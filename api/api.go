@@ -465,7 +465,6 @@ func fetchPrivateAPI(path string, method string, request interface{}, result int
 func nonce() string {
 	nonceIncrementalCounter++
 	nonce := strconv.FormatFloat(float64(time.Now().Unix()*15000)+nonceIncrementalCounter, 'f', 0, 64)
-	fmt.Println(nonce)
 	return nonce
 }
 
